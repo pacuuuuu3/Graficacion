@@ -238,12 +238,35 @@ void SoftwareRendererImp::rasterize_point( float x, float y, Color color ) {
 
 }
 
+  /* Implementación del algoritmo de Bresenham */
 void SoftwareRendererImp::rasterize_line( float x0, float y0,
                                           float x1, float y1,
                                           Color color) {
 
-  // Task 1: 
-  // Implement line rasterization
+  float deltaX = abs(x1-x0); /* Diferencia de las coordenadas x */
+  float deltaY = abs(y1-y0); /* Diferencia de las coordenadas y */
+  float p = 2*deltaY - deltaX; /* Constante p que se utiliza para decidir qué punto trazar (leer algoritmo para mayor información en http://garciaoscar10110795.blogspot.mx/p/algoritmo-de-bresenham-para-trazar.html */
+  float x, y, ultimo; /* Más constantes necesarias para el algoritmo */ 
+  if(x0 > x1){
+    x = x1;
+    y = y1;
+    ultimo = x0;
+  } else{
+    x = x0;
+    y = y0;
+    ultimo = x1;
+  }
+  rasterize_point(x, y, color);
+  while(x < ultimo){
+    x++;
+    if(p < 0)
+      p += 2*deltaY;
+    else{
+      y++;
+      p += 2*(deltaY - deltaX);
+    }
+    rasterize_point(x, y, color);
+  }
 }
 
 void SoftwareRendererImp::rasterize_triangle( float x0, float y0,
