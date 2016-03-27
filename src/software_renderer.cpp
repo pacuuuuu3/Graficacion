@@ -242,30 +242,51 @@ void SoftwareRendererImp::rasterize_point( float x, float y, Color color ) {
 void SoftwareRendererImp::rasterize_line( float x0, float y0,
                                           float x1, float y1,
                                           Color color) {
-
-  float deltaX = abs(x1-x0); /* Diferencia de las coordenadas x */
-  float deltaY = abs(y1-y0); /* Diferencia de las coordenadas y */
-  float p = 2*deltaY - deltaX; /* Constante p que se utiliza para decidir qué punto trazar (leer algoritmo para mayor información en http://garciaoscar10110795.blogspot.mx/p/algoritmo-de-bresenham-para-trazar.html */
-  float x, y, ultimo; /* Más constantes necesarias para el algoritmo */ 
-  if(x0 > x1){
-    x = x1;
-    y = y1;
-    ultimo = x0;
-  } else{
-    x = x0;
-    y = y0;
-    ultimo = x1;
+  double x, y, dx, dy, p, incE, incNE, stepx, stepy; /* Constantes necesarias para el algoritmo (para más información, consultar https://es.wikipedia.org/wiki/Algoritmo_de_Bresenham#Algoritmo) */
+  dx = (x1-x0);
+  dy = (y1-y0);
+  if(dy < 0){
+    dy = -dy;
+    stepy = -1;
+  }else
+    stepy = 1;
+  if(dx < 0){
+    dx = -dx;
+    stepx = -1;
   }
-  rasterize_point(x, y, color);
-  while(x < ultimo){
-    x++;
-    if(p < 0)
-      p += 2*deltaY;
-    else{
-      y++;
-      p += 2*(deltaY - deltaX);
+  else
+    stepx = 1;
+  x = x0;
+  y = y0;
+  rasterize_point(x0, y0, color);
+  if(dx > dy){
+    p = 2*dy - dx;
+    incE = 2*dy;
+    incNE = 2*(dy-dx);
+    while(abs(x - x1) >= 1){
+      x += stepx;
+      if(p < 0)
+	p += incE;
+      else{
+	y += stepy;
+	p += incNE;
+      }
+      rasterize_point(x, y, color);
     }
-    rasterize_point(x, y, color);
+  }else{
+    p = 2*dx - dy;
+    incE = 2*dx;
+    incNE = 2*(dx-dy);
+    while(abs(y - y1) >= 1){
+      y += stepy;
+      if(p < 0)
+	p += incE;
+      else{
+	x += stepx;
+	p += incNE;
+      }
+      rasterize_point(x, y, color);
+    }
   }
 }
 
