@@ -51,8 +51,14 @@ class SoftwareRenderer : public SVGRenderer {
   // Render target memory location
   unsigned char* render_target; 
 
+  /* El buffer para el supersampling */
+  unsigned char* supersample_target;
+
   // Target buffer dimension (in pixels)
   size_t target_w; size_t target_h;
+  
+  /* Dimensiones del supersampling buffer */
+  size_t supersample_w; size_t supersample_h;
 
   // Texture sampler being used
   Sampler2D* sampler;
@@ -118,13 +124,23 @@ class SoftwareRendererImp : public SoftwareRenderer {
   void rasterize_line( float x0, float y0,
                        float x1, float y1,
                        Color color);
-
+ 
+  void pinta_triangulo_derecho(float x0, float y0, float x1, 
+			       float y1, float x2, float y2, 
+			       Color color);
+  
+  void pinta_triangulo_volteado(float x0, float y0, float x1, 
+				float y1, float x2, float y2, 
+				Color color);
+  
   // rasterize a triangle
   void rasterize_triangle( float x0, float y0,
                            float x1, float y1,
                            float x2, float y2,
                            Color color );
 
+  
+  
   // rasterize an image
   void rasterize_image( float x0, float y0,
                         float x1, float y1,

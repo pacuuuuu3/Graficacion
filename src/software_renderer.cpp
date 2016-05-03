@@ -56,7 +56,9 @@ void SoftwareRendererImp::set_render_target( unsigned char* render_target,
   this->render_target = render_target;
   this->target_w = width;
   this->target_h = height;
-
+  this->supersample_w = width * this->sample_rate;
+  this->supersample_h = height * this-> sample_rate;
+  this->supersample_target = (unsigned char*)malloc(supersample_w * supersample_h * sizeof(char));
 }
 
 void SoftwareRendererImp::draw_element( SVGElement* element ) {
@@ -71,7 +73,7 @@ void SoftwareRendererImp::draw_element( SVGElement* element ) {
     case LINE:
       draw_line(static_cast<Line&>(*element));
       break;
-    case POLYLINE:
+  case POLYLINE:
       draw_polyline(static_cast<Polyline&>(*element));
       break;
     case RECT:
@@ -242,7 +244,7 @@ void SoftwareRendererImp::rasterize_point( float x, float y, Color color ) {
 void SoftwareRendererImp::rasterize_line( float x0, float y0,
                                           float x1, float y1,
                                           Color color) {
-  double x, y, dx, dy, p, incE, incNE, stepx, stepy; /* Constantes necesarias para el algoritmo (para más información, consultar https://es.wikipedia.org/wiki/Algoritmo_de_Bresenham#Algoritmo) */
+  double x, y, dx, dy, p, incre, inc, stepx, stepy; /* Constantes necesarias para el algoritmo (algoritmo sacado de https://es.wikipedia.org/wiki/Algoritmo_de_Bresenham#Algoritmo) */
   dx = (x1-x0);
   dy = (y1-y0);
   if(dy < 0){
@@ -261,44 +263,146 @@ void SoftwareRendererImp::rasterize_line( float x0, float y0,
   rasterize_point(x0, y0, color);
   if(dx > dy){
     p = 2*dy - dx;
-    incE = 2*dy;
-    incNE = 2*(dy-dx);
+    incre = 2*dy;
+    inc = 2*(dy-dx);
     while(abs(x - x1) >= 1){
       x += stepx;
       if(p < 0)
-	p += incE;
+	p += incre;
       else{
 	y += stepy;
-	p += incNE;
+	p += inc;
       }
       rasterize_point(x, y, color);
     }
   }else{
     p = 2*dx - dy;
-    incE = 2*dx;
-    incNE = 2*(dx-dy);
+    incre = 2*dx;
+    inc = 2*(dx-dy);
     while(abs(y - y1) >= 1){
       y += stepy;
       if(p < 0)
-	p += incE;
+	p += incre;
       else{
 	x += stepx;
-	p += incNE;
+	p += inc;
       }
       rasterize_point(x, y, color);
     }
   }
 }
+  /* Nuestro rasterize_triangle se divide a nuestro triángulo en dos partes, uno derecho y uno volteado. Haremos un método para pintar a cada uno */
+  
+  /* Pinta un triágunlo derecho (con base horizontal). Supone de antemano que y1 = y2 */
+  void SoftwareRendererImp::pinta_triangulo_derecho(float x0, float y0,
+						    float x1, float y1,
+						    float x2, float y2,
+						    Color color){
+    float pendiente1 = (x1-x0) / (y1-y0); /* La pendiente de la recta entre el punto v0 y v1 */
+    float pendiente2 = (x2-x0) / (y2-y0); /* La pendiente de la recta entre el punto v0 y v2 */
+    float xactual1 = x0;
+    float xactual2 = x0; /* La coordenada x del punto actual */
+    /* En este for se van dibujando líneas horizontales */
+    for (int linea = y0; linea <= y1; linea++){
+      rasterize_line(xactual1, linea, xactual2, linea, color);
+      xactual1 += pendiente1;
+      xactual2 += pendiente2;
+    }
+  }
 
+  /* Pinta un triágunlo volteado(uno derecho girado 180°). Supone de antemano que y0 = y1 */
+  void SoftwareRendererImp::pinta_triangulo_volteado(float x0, float y0,
+						    float x1, float y1,
+						    float x2, float y2,
+						    Color color){
+    float pendiente1 = (x2-x0) / (y2-y0); /* La pendiente de la recta entre el punto v0 y v1 */
+    float pendiente2 = (x2-x1) / (y2-y1); /* La pendiente de la recta entre el punto v0 y v2 */
+    float xactual1 = x2; 
+    float xactual2 = x2; /* La coordenada x del punto actual */
+    /* En este for se van dibujando líneas horizontales (ahora es hacia arriba)*/
+    for (int linea = y2; linea > y0; linea--){
+      xactual1 -= pendiente1;
+      xactual2 -= pendiente2;
+      rasterize_line(xactual1, linea, xactual2, linea, color);
+    }
+  }
+
+
+
+  /* Utiliza el algoritmo regular de rasterización de triángulos. Sacado de http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html */
 void SoftwareRendererImp::rasterize_triangle( float x0, float y0,
                                               float x1, float y1,
                                               float x2, float y2,
                                               Color color ) {
-  // Task 2: 
-  // Implement triangle rasterization
-
+  /* Primero ordenamos las coordenadas por y */
+  float ymax, ysnd, ythrd, xmax, xsnd, xthrd; /* La y más grande, la de en medio y la más pequeña (lo mismo para x) */
+  if(y0<y1){ //c1-1
+    if(y1>y2){ //c2-1
+      if(y0>y2){ //c3-1
+	ymax = y1;
+	xmax = x1;
+	ysnd = y0;
+	xsnd = x0;
+	ythrd = y2;
+	xthrd = x2;
+      }else{ //c3-2
+	ymax = y1;
+	xmax = x1;
+	ysnd = y2;
+	xsnd = x2;
+	ythrd = y0;
+	xthrd = x0;
+      }
+    }else{ //c2-2
+      ymax = y2;
+      xmax = x2;
+      ysnd = y1;
+      xsnd = x1;
+      ythrd = y0;
+      xthrd = x0;
+    } 
+  }else{ //c1-1
+    if(y0>y2){ //c4-1
+      if(y2>y1){ //c5-1
+	ymax = y0;
+	xmax = x0;
+	ysnd = y2;
+	xsnd = x2;
+	ythrd = y1;
+	xthrd = x1;
+      }else{ //c5-2
+	ymax = y0;
+	xmax = x0;
+	ysnd = y1;
+	xsnd = x1;
+	ythrd = y2;
+	xthrd = x2;
+      }
+    }else{ //c4-2
+      ymax = y2;
+      xmax = x2;
+      ysnd = y0;
+      xsnd = x0;
+      ythrd = y1;
+      xthrd = x1;
+    }
+  } 
+  
+  /* Si ymax == ysnd, tenemos un triángulo derecho */
+  if(abs(ymax - ysnd) < 1)
+    pinta_triangulo_derecho(xthrd, ythrd, xsnd, ysnd, xmax, ymax, color);
+  /* Si ythrd == ysnd, tenemos un triángulo volteado */
+  else if(abs(ysnd - ythrd) < 1)
+    pinta_triangulo_volteado(xthrd, ythrd, xsnd, ysnd, xmax, ymax, color);
+  else{
+    /* Caso general */
+    float x4 = xthrd + (((ysnd - ythrd) / (ymax - ythrd)) * (xmax - xthrd)); /* Coordenada x en la cual se parte el triángulo */
+    float y4 = ysnd; /* Coordenada y en la cual se parte el triángulo */
+    pinta_triangulo_derecho(xthrd, ythrd, xsnd, ysnd, x4, y4, color);
+    pinta_triangulo_volteado(xsnd, ysnd, x4, y4, xmax, ymax, color); 
+  }
 }
-
+  
 void SoftwareRendererImp::rasterize_image( float x0, float y0,
                                            float x1, float y1,
                                            Texture& tex ) {
@@ -313,6 +417,7 @@ void SoftwareRendererImp::resolve( void ) {
   // Task 3: 
   // Implement supersampling
   // You may also need to modify other functions marked with "Task 3".
+  free(this->supersample_target);
   return;
 
 }
